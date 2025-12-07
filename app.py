@@ -1,5 +1,4 @@
 import streamlit as st
-import numpy as np
 import math
 import re
 
@@ -650,7 +649,7 @@ Step 3: Comparison with full circle
                                 a = math.sqrt(c*c - b*b)
                                 steps = f"Given: b = {b}, c = {c}\n\nStep 1: Find side a\n  a² = c² - b² = {c}² - {b}² = {format_number(c*c - b*b)}\n  a = √{format_number(c*c - b*b)} = {format_number(a)}"
                             
-                            A = to_degrees(math.asin(a / c))
+                            A = to_degrees(math.asin(max(-1, min(1, a / c))))
                             B = 90 - A
                             steps += f"\n\nStep 2: Find angle A\n  sin(A) = a/c = {format_number(a)}/{format_number(c)} = {format_number(a/c)}\n  A = arcsin({format_number(a/c)}) = {format_number(A)}°"
                             steps += f"\n\nStep 3: Find angle B\n  B = 90° - A = 90° - {format_number(A)}° = {format_number(B)}°"
@@ -1377,7 +1376,15 @@ Step 3: Convert to degrees
                             else:
                                 B = to_degrees(math.asin(sin_B))
                                 C = 180 - A - B
-                                c = a * math.sin(to_radians(C)) / math.sin(to_radians(A))
+                                if C <= 0:
+                                    st.error("No valid triangle (angles sum exceeds 180°)")
+                                else:
+                                    c = a * math.sin(to_radians(C)) / math.sin(to_radians(A))
+                                    # Check for second solution (ambiguous case)
+                                    B2 = 180 - B
+                                    C2 = 180 - A - B2
+                                    if C2 > 0 and B2 != B:
+                                        st.warning(f"⚠️ Ambiguous case: Second solution exists with B = {format_number(B2)}°, C = {format_number(C2)}°")
                     
                     elif case_type == "SAS":
                         a = parse_number(obl_a)
@@ -1388,8 +1395,12 @@ Step 3: Convert to degrees
                             st.error("Please enter all values.")
                         else:
                             c = math.sqrt(a*a + b*b - 2*a*b*math.cos(to_radians(C)))
-                            A = to_degrees(math.acos((b*b + c*c - a*a) / (2*b*c)))
-                            B = 180 - A - C
+                            if c < 1e-10:
+                                st.error("Invalid triangle configuration")
+                            else:
+                                cos_A = max(-1, min(1, (b*b + c*c - a*a) / (2*b*c)))
+                                A = to_degrees(math.acos(cos_A))
+                                B = 180 - A - C
                     
                     else:  # SSS
                         a = parse_number(obl_a)
@@ -1401,8 +1412,10 @@ Step 3: Convert to degrees
                         elif a + b <= c or a + c <= b or b + c <= a:
                             st.error("Invalid triangle: sum of any two sides must be greater than the third")
                         else:
-                            A = to_degrees(math.acos((b*b + c*c - a*a) / (2*b*c)))
-                            B = to_degrees(math.acos((a*a + c*c - b*b) / (2*a*c)))
+                            cos_A = max(-1, min(1, (b*b + c*c - a*a) / (2*b*c)))
+                            cos_B = max(-1, min(1, (a*a + c*c - b*b) / (2*a*c)))
+                            A = to_degrees(math.acos(cos_A))
+                            B = to_degrees(math.acos(cos_B))
                             C = 180 - A - B
                     
                     if all(x is not None for x in [a, b, c, A, B, C]):
@@ -1768,7 +1781,8 @@ else:  # Advanced
                                 st.error("Cannot find angle with zero vector")
                             else:
                                 dot = u_x * v_x + u_y * v_y
-                                angle = math.acos(dot / (mag_u * mag_v))
+                                cos_angle = max(-1, min(1, dot / (mag_u * mag_v)))  # Clamp to [-1, 1]
+                                angle = math.acos(cos_angle)
                                 if use_radians:
                                     st.metric("Angle", f"{format_number(angle)} rad")
                                 else:
